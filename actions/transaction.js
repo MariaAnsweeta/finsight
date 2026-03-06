@@ -9,6 +9,48 @@ import { request } from "@arcjet/next";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
+async function getAvailableModel() {
+  // Use the 2.5 series which is currently the stable standard
+  const models = [
+    process.env.GEMINI_MODEL || "gemini-2.5-flash", 
+    "gemini-2.0-flash" 
+  ];
+
+  for (const modelName of models) {
+    try {
+      // Force the stable 'v1' API version
+      const model = genAI.getGenerativeModel(
+        { model: modelName },
+        { apiVersion: "v1" } 
+      );
+      
+      return { model, modelName };
+    } catch (error) {
+      console.log(`Model ${modelName} failed on stable v1, trying next...`);
+    }
+  }
+  throw new Error("No Gemini models available. Check your API key and billing plan.");
+}
+
+//   async function getAvailableModel() {
+//   // Define a fallback chain: Pro first, then Flash
+//   const models = [
+//     process.env.GEMINI_MODEL || "gemini-1.5-pro", 
+//     "gemini-1.5-flash" 
+//   ];
+
+//   for (const modelName of models) {
+//     try {
+//       const model = genAI.getGenerativeModel({ model: modelName });
+//       // Test the model with a tiny no-op or just return it
+//       return { model, modelName };
+//     } catch (error) {
+//       console.error(`Model ${modelName} failed:`, error.message);
+//     }
+//   }
+//   throw new Error("No Gemini models available. Check your API Key and Quota.");
+// }
+
 const serializeAmount = (obj) => ({
   ...obj,
   amount: obj.amount.toNumber(),
@@ -230,7 +272,8 @@ export async function getUserTransactions(query = {}) {
 // Scan Receipt
 export async function scanReceipt(file) {
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const { model, modelName } = await getAvailableModel();
+    console.log(`Using model for receipt scanning: ${modelName}`);
 
     // Convert File to ArrayBuffer
     const arrayBuffer = await file.arrayBuffer();
